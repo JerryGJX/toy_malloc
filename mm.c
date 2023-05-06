@@ -40,7 +40,7 @@
 #define WSIZE 4
 #define DSIZE 8
 #define ALIGNMENT 8
-#define CHUNKSIZE 24
+#define CHUNKSIZE 456
 #define MINSIZE 24 // 4 + 8 + 8 + 4(保证了free一个块之后可以成为一个blank block)
 
 #define OPT
