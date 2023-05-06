@@ -1,7 +1,9 @@
 [mm_init] enter 
 [mm_init] exit 
+[free] enter -34359738368
+[free] wrong exit 
 [malloc] enter 
-[malloc] size = 2040 
+[malloc] size = 1 
 [malloc] extend heap 
 [extend_heap] enter 
 [extend_heap] exit 
@@ -10,114 +12,152 @@
 [add_to_list] bp = 800000020 
 [coalesce] exit 
 [place] enter 
+[place] asize = 24 
 [remove_from_list] bp = 800000020 
+[place] split, bp = 800000020 
+[add_to_list] bp = 800000038 
 [place] exit 
 [malloc] exit 
 [malloc] enter 
-[malloc] size = 2040 
+[malloc] size = 2 
+[place] enter 
+[place] asize = 24 
+[remove_from_list] bp = 800000038 
+[place] split, bp = 800000038 
+[add_to_list] bp = 800000050 
+[place] exit 
+[malloc] exit 
+[malloc] enter 
+[malloc] size = 3 
+[place] enter 
+[place] asize = 24 
+[remove_from_list] bp = 800000050 
+[place] split, bp = 800000050 
+[add_to_list] bp = 800000068 
+[place] exit 
+[malloc] exit 
+[malloc] enter 
+[malloc] size = 4 
+[place] enter 
+[place] asize = 24 
+[remove_from_list] bp = 800000068 
+[place] split, bp = 800000068 
+[add_to_list] bp = 800000080 
+[place] exit 
+[malloc] exit 
+[malloc] enter 
+[malloc] size = 100000 
 [malloc] extend heap 
 [extend_heap] enter 
 [extend_heap] exit 
 [coalesce] enter 
-[coalesce] bp = 800000820 
-[add_to_list] bp = 800000820 
+[coalesce] bp = 8000001d0 
+[coalesce] prev_ptr = 800000080 
+[remove_from_list] bp = 800000080 
+[add_to_list] bp = 800000080 
 [coalesce] exit 
 [place] enter 
-[remove_from_list] bp = 800000820 
+[place] asize = 100008 
+[remove_from_list] bp = 800000080 
+[place] split, bp = 800000080 
+[add_to_list] bp = 800018728 
 [place] exit 
 [malloc] exit 
-[free] enter 2080
-[coalesce] enter 
-[coalesce] bp = 800000820 
-[add_to_list] bp = 800000820 
-[coalesce] exit 
-[free] exit 
+[realloc] enter 
+[realloc] exit 
 [malloc] enter 
-[malloc] size = 48 
+[malloc] size = 10 
 [place] enter 
-[remove_from_list] bp = 800000820 
-[place] split, bp = 800000820 
-[add_to_list] bp = 800000858 
+[place] asize = 24 
+[remove_from_list] bp = 800018728 
+[place] split, bp = 800018728 
+[add_to_list] bp = 800018740 
 [place] exit 
 [malloc] exit 
 [malloc] enter 
-[malloc] size = 4072 
+[malloc] size = 100 
+[place] enter 
+[place] asize = 112 
+[remove_from_list] bp = 800018740 
+[place] split, bp = 800018740 
+[add_to_list] bp = 8000187b0 
+[place] exit 
+[malloc] exit 
+[realloc] enter 
+[malloc] enter 
+[malloc] size = 200 
 [malloc] extend heap 
 [extend_heap] enter 
 [extend_heap] exit 
 [coalesce] enter 
-[coalesce] bp = 800001020 
-[remove_from_list] bp = 800000858 
-[add_to_list] bp = 800000858 
+[coalesce] bp = 800018878 
+[coalesce] prev_ptr = 8000187b0 
+[remove_from_list] bp = 8000187b0 
+[add_to_list] bp = 8000187b0 
 [coalesce] exit 
 [place] enter 
-[remove_from_list] bp = 800000858 
-[place] split, bp = 800000858 
-[add_to_list] bp = 800001848 
+[place] asize = 208 
+[remove_from_list] bp = 8000187b0 
+[place] split, bp = 8000187b0 
+[add_to_list] bp = 800018880 
 [place] exit 
 [malloc] exit 
-[free] enter 2136
+[free] enter 100160
 [coalesce] enter 
-[coalesce] bp = 800000858 
-[remove_from_list] bp = 800001848 
-[add_to_list] bp = 800000858 
+[coalesce] bp = 800018740 
+[add_to_list] bp = 800018740 
 [coalesce] exit 
 [free] exit 
+[realloc] exit 
 [malloc] enter 
-[malloc] size = 4072 
+[malloc] size = 100 
 [place] enter 
-[remove_from_list] bp = 800000858 
-[place] split, bp = 800000858 
-[add_to_list] bp = 800001848 
+[place] asize = 112 
+[remove_from_list] bp = 800018740 
 [place] exit 
 [malloc] exit 
-[free] enter 32
-[coalesce] enter 
-[coalesce] bp = 800000020 
-[add_to_list] bp = 800000020 
-[coalesce] exit 
-[free] exit 
-[free] enter 2080
-[coalesce] enter 
-[coalesce] bp = 800000820 
-[remove_from_list] bp = 800000020 
-[add_to_list] bp = 800000020 
-[coalesce] exit 
-[free] exit 
+[realloc] enter 
+[place] enter 
+[place] asize = 64 
+[place] split, bp = 800018740 
+[add_to_list] bp = 800018780 
+[place] exit 
+[realloc] exit 
 [malloc] enter 
-[malloc] size = 4072 
-[malloc] extend heap 
-[extend_heap] enter 
-[extend_heap] exit 
-[coalesce] enter 
-[coalesce] bp = 800002010 
-[remove_from_list] bp = 800001848 
-[add_to_list] bp = 800001848 
-[coalesce] exit 
+[malloc] size = 100 
 [place] enter 
-[remove_from_list] bp = 800001848 
-[place] split, bp = 800001848 
-[add_to_list] bp = 800002838 
+[place] asize = 112 
+[remove_from_list] bp = 800018880 
+[place] split, bp = 800018880 
+[add_to_list] bp = 8000188f0 
 [place] exit 
 [malloc] exit 
-[free] enter 2136
+[realloc] enter 
+[place] enter 
+[place] asize = 112 
+[place] exit 
+[realloc] exit 
+[malloc] enter 
+[malloc] size = 100 
+[place] enter 
+[place] asize = 112 
+[remove_from_list] bp = 8000188f0 
+[place] split, bp = 8000188f0 
+[add_to_list] bp = 800018960 
+[place] exit 
+[malloc] exit 
+[realloc] enter 
+[free] enter 100592
 [coalesce] enter 
-[coalesce] bp = 800000858 
-[remove_from_list] bp = 800000020 
-[add_to_list] bp = 800000020 
+[coalesce] bp = 8000188f0 
+[remove_from_list] bp = 800018960 
+[add_to_list] bp = 8000188f0 
 [coalesce] exit 
 [free] exit 
-[free] enter 6216
-[coalesce] enter 
-[coalesce] bp = 800001848 
-[remove_from_list] bp = 800000020 
-[remove_from_list] bp = 800002838 
-[add_to_list] bp = 800000020 
-[coalesce] exit 
-[free] exit 
+[realloc] exit 
 
 
-correctness check finished, by running tracefile "traces/short1-bal.rep".
+correctness check finished, by running tracefile "traces/corners.rep".
  => correct.
 
 Perf index = 0.000000 (util) + 0.000000 (thru) = 0.000000
