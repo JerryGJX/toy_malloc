@@ -40,8 +40,10 @@
 #define WSIZE 4
 #define DSIZE 8
 #define ALIGNMENT 8
-#define CHUNKSIZE (456)
+#define CHUNKSIZE (432)
 #define MINSIZE 24 // 4 + 8 + 8 + 4(保证了free一个块之后可以成为一个blank block)
+
+#define OPT
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~0x7)
@@ -67,11 +69,17 @@ warning:
 have to secure that p is pointing to the head
 */
 #define GET_SIZE(p) (GET(p) & ~0x7)
-#define GET_ALLOC(p) (GET(p) & 0x1)
+#define GET_SELF_ALLOC(p) (GET(p) & 0x1)
+#define GET_PREV_ALLOC(p) (GET(p) & 0x2)
+#define GET_ALL_ALLOC(p) (GET(p) & 0x3)
 
 /*Given block ptr bp, compute address of its header and footer*/
 #define HEAD(bp) ((char *)(bp)-WSIZE)
+#ifndef OPT
 #define FOOT(bp) ((char *)(bp) + GET_SIZE(HEAD(bp)) - 2 * WSIZE)
+#else
+#define FOOT(bp) ((char *)(bp) + GET_SIZE(HEAD(bp)) - WSIZE)
+#endif
 /*for blank block*/
 #define PREV_BLANK_POS(bp) ((char *)(bp))
 #define NEXT_BLANK_POS(bp) ((bp) ? ((char *)(bp) + DSIZE) : (char *)0)
@@ -80,6 +88,8 @@ have to secure that p is pointing to the head
 
 /*Given block ptr bp, compute address of next and previous blocks*/
 #define PREV_BLOCK(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-2 * WSIZE)))
+
+
 #define NEXT_BLOCK(bp) ((char *)(bp) + GET_SIZE(HEAD(bp)))
 
 static char *heap_listp = 0;
@@ -107,9 +117,19 @@ static void remove_from_list(void *bp) {
   PUT_PTR(PREV_BLANK_POS(next_bp), prev_bp);
 }
 
+static void update_head_and_foot(void *bp, size_t size, int alloc) {
+  int prev_alloc = GET_PREV_ALLOC(HEAD(bp));
+  PUT(HEAD(bp), PACK(size, prev_alloc | alloc));
+  if (!alloc)
+    PUT(FOOT(bp), PACK(size, prev_alloc | alloc));
+  // PUT(HEAD());
+}
+
 void *coalesce(void *bp) {
 
   dbg_printf("[coalesce] enter \n");
+
+  dbg_printf("[coalesce] bp = %llx \n", (long long)bp);
 
   size_t size = GET_SIZE(HEAD(bp));
   //  dbg_printf("[coalesce] bp = %lld; * 0X800000018 = %lld;
@@ -117,28 +137,57 @@ void *coalesce(void *bp) {
   //  long)(GET(0X800000018)), (long long)((long long)(PREV_BLOCK(bp)) -
   //  0x800000000));
 
-  // dbg_printf("[coalesce] bp = %llx; PREV_BLOCK(bp) = %llx; FOOT(PREV_BLOCK(bp)) = %llx;  \n ",(long long)(bp), (long long)(PREV_BLOCK(bp)), (long long)(FOOT(PREV_BLOCK(bp))));
+  // dbg_printf("[coalesce] bp = %llx; PREV_BLOCK(bp) = %llx;
+  // FOOT(PREV_BLOCK(bp)) = %llx;  \n ",(long long)(bp), (long
+  // long)(PREV_BLOCK(bp)), (long long)(FOOT(PREV_BLOCK(bp))));
 
-  size_t prev_alloc = GET_ALLOC(FOOT(PREV_BLOCK(bp)));
-  size_t next_alloc = GET_ALLOC(HEAD(NEXT_BLOCK(bp)));
+#ifndef OPT
+  size_t prev_alloc = GET_SELF_ALLOC(FOOT(PREV_BLOCK(bp)));
+#else
+  size_t prev_alloc = GET_PREV_ALLOC(HEAD(bp));
+  dbg_printf("[coalesce] prev_alloc = %lld \n", (long long)prev_alloc);
+#endif
+
+  size_t next_alloc = GET_SELF_ALLOC(HEAD(NEXT_BLOCK(bp)));
 
   // dbg_printf("[coalesce] prev_alloc = %lld \n", (long long)prev_alloc);
 
   if (!prev_alloc) {
     void *prev_ptr = PREV_BLOCK(bp);
+    dbg_printf("[coalesce] prev_ptr = %llx \n", (long long)prev_ptr);
     remove_from_list(prev_ptr);
     size += GET_SIZE(HEAD(prev_ptr));
+
+#ifndef OPT
     PUT(HEAD(prev_ptr), PACK(size, 0));
     PUT(FOOT(bp), PACK(size, 0));
+#else
+    size_t prev_all_alloc = GET_ALL_ALLOC(HEAD(prev_ptr));
+    PUT(HEAD(prev_ptr), PACK(size, prev_all_alloc));
+    PUT(FOOT(bp), PACK(size, prev_all_alloc));
+#endif
+
     bp = prev_ptr;
   }
   if (!next_alloc) {
     void *next_ptr = NEXT_BLOCK(bp);
     remove_from_list(next_ptr);
     size += GET_SIZE(HEAD(next_ptr));
+#ifndef OPT
     PUT(HEAD(bp), PACK(size, 0));
     PUT(FOOT(next_ptr), PACK(size, 0));
+#else
+    size_t bp_all_alloc = GET_ALL_ALLOC(HEAD(bp));
+    PUT(HEAD(bp), PACK(size, bp_all_alloc));
+    PUT(FOOT(next_ptr), PACK(size, bp_all_alloc));
+#endif
+  } else {
+#ifdef OPT
+    void *next_ptr = NEXT_BLOCK(bp);
+    PUT(HEAD(next_ptr), PACK(GET_SIZE(HEAD(next_ptr)), 1));
+#endif
   }
+
   add_to_list(bp);
 
   dbg_printf("[coalesce] exit \n");
@@ -159,20 +208,40 @@ static void *find_fit(size_t asize) {
 static void place(void *bp, size_t asize) {
   dbg_printf("[place] enter \n");
   size_t csize = GET_SIZE(HEAD(bp));
-  size_t bp_alloc = GET_ALLOC(HEAD(bp));
+  size_t bp_alloc = GET_SELF_ALLOC(HEAD(bp));
+#ifdef OPT
+  size_t bp_all_alloc = GET_ALL_ALLOC(HEAD(bp));
+#endif
   if (!bp_alloc)
     remove_from_list(bp);
   if ((csize - asize) >= MINSIZE) {
     dbg_printf("[place] split, bp = %llx \n", (long long)(bp));
+#ifndef OPT
     PUT(HEAD(bp), PACK(asize, 1));
     PUT(FOOT(bp), PACK(asize, 1));
     bp = NEXT_BLOCK(bp);
     PUT(HEAD(bp), PACK(csize - asize, 0));
     PUT(FOOT(bp), PACK(csize - asize, 0));
     add_to_list(bp);
+#else
+    PUT(HEAD(bp), PACK(asize, bp_all_alloc | 1));
+    // PUT(FOOT(bp), PACK(asize, 1));
+    bp = NEXT_BLOCK(bp);
+    PUT(HEAD(bp), PACK(csize - asize, 2));
+    PUT(FOOT(bp), PACK(csize - asize, 2));
+    add_to_list(bp);
+#endif
   } else {
+#ifndef OPT
     PUT(HEAD(bp), PACK(csize, 1));
     PUT(FOOT(bp), PACK(csize, 1));
+#else
+    PUT(HEAD(bp), PACK(csize, bp_all_alloc | 1));
+    PUT(FOOT(bp), PACK(csize, bp_all_alloc | 1));
+    void *nxt_ptr = NEXT_BLOCK(bp);
+    PUT(HEAD(nxt_ptr),
+        PACK(GET_SIZE(HEAD(nxt_ptr)), GET_SELF_ALLOC(HEAD(nxt_ptr)) | 2));
+#endif
   }
   dbg_printf("[place] exit \n");
 }
@@ -188,12 +257,19 @@ static void *extend_heap(size_t size) {
   if ((long)(bp = mem_sbrk(size)) == -1)
     return NULL;
 
-  // dbg_printf("[extend_heap] GET(0X800000018) = %lld \n", (long
-  // long)(GET(0X800000018)));
-  /*Initialize free block header/footer and the epilogue header*/
+// dbg_printf("[extend_heap] GET(0X800000018) = %lld \n", (long
+// long)(GET(0X800000018)));
+/*Initialize free block header/footer and the epilogue header*/
+#ifndef OPT
   PUT(HEAD(bp), PACK(size, 0));          /*Free block header*/
   PUT(FOOT(bp), PACK(size, 0));          /*Free block footer*/
   PUT(HEAD(NEXT_BLOCK(bp)), PACK(0, 1)); /*New epilogue header*/
+#else
+  size_t prev_alloc = GET_PREV_ALLOC(HEAD(bp));
+  PUT(HEAD(bp), PACK(size, prev_alloc | 0));
+  PUT(FOOT(bp), PACK(size, prev_alloc | 0));
+  PUT(HEAD(NEXT_BLOCK(bp)), PACK(0, 1));
+#endif
 
   // dbg_printf("[extend_heap] bp = %lld; size = %lld; HEAD(bp) = %lld; FOOT(bp)
   // = %lld; HEAD(NEXT_BLOCK(bp)) = %lld \n",(long long) (bp - 0x800000000),
@@ -213,7 +289,7 @@ static void *extend_heap(size_t size) {
  * mm_init - Called when a new trace starts.
  */
 int mm_init(void) {
-  // freopen("log.txt", "w", stdout);
+  // freopen("log_old.txt", "w", stdout);
   dbg_printf("[mm_init] enter \n");
   heap_listp = mem_sbrk(8 * WSIZE);
   // dbg_printf("[mm_init] heap_listp = %llx \n",(long long) heap_listp);
@@ -226,15 +302,16 @@ int mm_init(void) {
   PUT_PTR(heap_listp + (2 * WSIZE), 0);              /* Blank prev pointer */
   PUT_PTR(heap_listp + (4 * WSIZE), 0);              /* Blank next pointer */
   PUT(heap_listp + (6 * WSIZE), PACK(6 * WSIZE, 1)); /* Prologue footer */
-  // dbg_printf("[mm_init] heap_listp + (6 * WSIZE) = %llx \n",(long long)
-  // (heap_listp + (6 * WSIZE))); dbg_printf("[mm_init] PACK(6 * WSIZE, 1) =
-  // %lld \n",(long long) (PACK(6 * WSIZE, 1))); dbg_printf("[mm_init]
-  // GET(heap_listp + (6 * WSIZE)) = %lld; GET(0X800000018) = %lld \n",(long
-  // long) (GET(heap_listp + (6 * WSIZE))), (long long)(GET(0X800000018)));
+
+#ifndef OPT
+  PUT(heap_listp + (7 * WSIZE), PACK(0, 1)); /* Epilogue header */
+#else
+  PUT(heap_listp + (7 * WSIZE), PACK(0, 3)); /* Epilogue header */
+#endif
 
   // dbg_printf("[mm_init] GET(0X800000018) = %lld \n", (long
   // long)(GET(0X800000018)));
-  PUT(heap_listp + (7 * WSIZE), PACK(0, 1)); /* Epilogue header */
+
   // dbg_printf("[mm_init] GET(0X800000018) = %lld \n", (long
   // long)(GET(0X800000018)));
   heap_listp += (2 * WSIZE);
@@ -257,13 +334,16 @@ void *malloc(size_t size) {
   // long)(GET(0X800000018)));
 
   // malloc_cnt++;
-  // if (malloc_cnt > 15)
+  // if (malloc_cnt > 6)
   //   exit(0);
 
   dbg_printf("[malloc] enter \n");
   dbg_printf("[malloc] size = %lld \n", (long long)size);
-
+#ifndef OPT
   int newsize = ALIGN(MAX(MINSIZE, size + 2 * WSIZE));
+#else
+  int newsize = ALIGN(MAX(MINSIZE, size + WSIZE));
+#endif
   void *target_bp = find_fit(newsize);
   if (target_bp == NULL) {
     dbg_printf("[malloc] extend heap \n");
@@ -276,8 +356,12 @@ void *malloc(size_t size) {
 
   place(target_bp, newsize);
 
-dbg_printf("[malloc] bp = %llx; PREV_BLOCK(bp) = %llx; FOOT(PREV_BLOCK(bp)) = %llx; mem_sbrk(0) = %llx \n ",(long long)(target_bp), (long long)(PREV_BLOCK(target_bp)), (long long)(FOOT(PREV_BLOCK(target_bp))), (long long)mem_sbrk(0));
-
+  // dbg_printf("[malloc] bp = %llx; PREV_BLOCK(bp) = %llx; FOOT(PREV_BLOCK(bp))
+  // "
+  //            "= %llx; mem_sbrk(0) = %llx \n ",
+  //            (long long)(target_bp), (long long)(PREV_BLOCK(target_bp)),
+  //            (long long)(FOOT(PREV_BLOCK(target_bp))), (long
+  //            long)mem_sbrk(0));
 
   dbg_printf("[malloc] exit \n");
   return target_bp;
@@ -309,9 +393,16 @@ void free(void *ptr) {
   }
 
   size_t size = GET_SIZE(HEAD(ptr));
+#ifndef OPT
   PUT(HEAD(ptr), PACK(size, 0));
   PUT(FOOT(ptr), PACK(size, 0));
-
+#else
+  size_t prev_alloc = GET_PREV_ALLOC(HEAD(ptr));
+  PUT(HEAD(ptr), PACK(size, prev_alloc));
+  PUT(FOOT(ptr), PACK(size, prev_alloc));
+  void *nxt_ptr = NEXT_BLOCK(ptr);
+  PUT(HEAD(nxt_ptr), PACK(GET_SIZE(HEAD(nxt_ptr)), GET_SELF_ALLOC(HEAD(nxt_ptr))));
+#endif
   coalesce(ptr);
   dbg_printf("[free] exit \n");
 }
@@ -337,7 +428,11 @@ void *realloc(void *oldptr, size_t size) {
     return malloc(size);
   }
   oldsize = GET_SIZE(HEAD(oldptr));
+#ifndef OPT
   size_t new_size = ALIGN(MAX(MINSIZE, size + 2 * WSIZE));
+#else
+  size_t new_size = ALIGN(MAX(MINSIZE, size + WSIZE));
+#endif
   if (new_size <= oldsize) {
     place(oldptr, new_size);
     dbg_printf("[realloc] exit \n");
@@ -348,7 +443,11 @@ void *realloc(void *oldptr, size_t size) {
       dbg_printf("[realloc] exit \n");
       return NULL;
     }
+#ifndef OPT
     memcpy(newptr, oldptr, oldsize - 2 * WSIZE);
+#else
+    memcpy(newptr, oldptr, oldsize - WSIZE);
+#endif
     free(oldptr);
     dbg_printf("[realloc] exit \n");
     return newptr;

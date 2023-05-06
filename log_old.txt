@@ -1,0 +1,123 @@
+[mm_init] enter 
+[mm_init] exit 
+[malloc] enter 
+[malloc] size = 2040 
+[malloc] extend heap 
+[extend_heap] enter 
+[extend_heap] exit 
+[coalesce] enter 
+[coalesce] bp = 800000020 
+[add_to_list] bp = 800000020 
+[coalesce] exit 
+[place] enter 
+[remove_from_list] bp = 800000020 
+[place] exit 
+[malloc] exit 
+[malloc] enter 
+[malloc] size = 2040 
+[malloc] extend heap 
+[extend_heap] enter 
+[extend_heap] exit 
+[coalesce] enter 
+[coalesce] bp = 800000820 
+[add_to_list] bp = 800000820 
+[coalesce] exit 
+[place] enter 
+[remove_from_list] bp = 800000820 
+[place] exit 
+[malloc] exit 
+[free] enter 2080
+[coalesce] enter 
+[coalesce] bp = 800000820 
+[add_to_list] bp = 800000820 
+[coalesce] exit 
+[free] exit 
+[malloc] enter 
+[malloc] size = 48 
+[place] enter 
+[remove_from_list] bp = 800000820 
+[place] split, bp = 800000820 
+[add_to_list] bp = 800000858 
+[place] exit 
+[malloc] exit 
+[malloc] enter 
+[malloc] size = 4072 
+[malloc] extend heap 
+[extend_heap] enter 
+[extend_heap] exit 
+[coalesce] enter 
+[coalesce] bp = 800001020 
+[remove_from_list] bp = 800000858 
+[add_to_list] bp = 800000858 
+[coalesce] exit 
+[place] enter 
+[remove_from_list] bp = 800000858 
+[place] split, bp = 800000858 
+[add_to_list] bp = 800001848 
+[place] exit 
+[malloc] exit 
+[free] enter 2136
+[coalesce] enter 
+[coalesce] bp = 800000858 
+[remove_from_list] bp = 800001848 
+[add_to_list] bp = 800000858 
+[coalesce] exit 
+[free] exit 
+[malloc] enter 
+[malloc] size = 4072 
+[place] enter 
+[remove_from_list] bp = 800000858 
+[place] split, bp = 800000858 
+[add_to_list] bp = 800001848 
+[place] exit 
+[malloc] exit 
+[free] enter 32
+[coalesce] enter 
+[coalesce] bp = 800000020 
+[add_to_list] bp = 800000020 
+[coalesce] exit 
+[free] exit 
+[free] enter 2080
+[coalesce] enter 
+[coalesce] bp = 800000820 
+[remove_from_list] bp = 800000020 
+[add_to_list] bp = 800000020 
+[coalesce] exit 
+[free] exit 
+[malloc] enter 
+[malloc] size = 4072 
+[malloc] extend heap 
+[extend_heap] enter 
+[extend_heap] exit 
+[coalesce] enter 
+[coalesce] bp = 800002010 
+[remove_from_list] bp = 800001848 
+[add_to_list] bp = 800001848 
+[coalesce] exit 
+[place] enter 
+[remove_from_list] bp = 800001848 
+[place] split, bp = 800001848 
+[add_to_list] bp = 800002838 
+[place] exit 
+[malloc] exit 
+[free] enter 2136
+[coalesce] enter 
+[coalesce] bp = 800000858 
+[remove_from_list] bp = 800000020 
+[add_to_list] bp = 800000020 
+[coalesce] exit 
+[free] exit 
+[free] enter 6216
+[coalesce] enter 
+[coalesce] bp = 800001848 
+[remove_from_list] bp = 800000020 
+[remove_from_list] bp = 800002838 
+[add_to_list] bp = 800000020 
+[coalesce] exit 
+[free] exit 
+
+
+correctness check finished, by running tracefile "traces/short1-bal.rep".
+ => correct.
+
+Perf index = 0.000000 (util) + 0.000000 (thru) = 0.000000
