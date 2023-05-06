@@ -10,6 +10,7 @@
  * it never frees anything.
  */
 #include <assert.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,13 +38,26 @@
 #endif /* def DRIVER */
 
 /* single word (4) or double word (8) alignment */
+
+#define OPT1
+#define OPT2
+
 #define WSIZE 4
+#ifndef OPT2
 #define DSIZE 8
+#else
+#define DSIZE 4
+#endif
 #define ALIGNMENT 8
+
+
+#ifndef OPT2
 #define CHUNKSIZE 456
 #define MINSIZE 24 // 4 + 8 + 8 + 4(保证了free一个块之后可以成为一个blank block)
-
-#define OPT
+#else
+#define CHUNKSIZE 176
+#define MINSIZE 16
+#endif
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT - 1)) & ~0x7)
@@ -59,9 +73,19 @@
 
 /*Read and write a word at address p*/
 #define GET(p) ((p) ? *(uint *)(p) : 0)
+#ifndef OPT2
 #define GET_PTR(p) ((p) ? (void *)(*(size_t *)(p)) : 0)
+#else
+#define GET_PTR(p) ((p) ? (void *)((size_t)(*(uint *)(p)) + 0x800000000) : 0)
+#endif
+
 #define PUT(p, val) ((p) ? *(uint *)(p) = (val) : 0)
+#ifndef OPT2
 #define PUT_PTR(p, ptr) ((p) ? *(size_t *)(p) = (size_t)(ptr) : 0)
+#else
+#define PUT_PTR(p, ptr)                                                        \
+  ((p) ? *(uint *)(p) = (uint)((size_t)(ptr)-0x800000000) : 0)
+#endif
 
 /*Read the size and allocated fields from address p*/
 /*
@@ -75,7 +99,7 @@ have to secure that p is pointing to the head
 
 /*Given block ptr bp, compute address of its header and footer*/
 #define HEAD(bp) ((char *)(bp)-WSIZE)
-// #ifndef OPT
+// #ifndef OPT1
 #define FOOT(bp) ((char *)(bp) + GET_SIZE(HEAD(bp)) - 2 * WSIZE)
 // #else
 // #define FOOT(bp) ((char *)(bp) + GET_SIZE(HEAD(bp)) - WSIZE)
@@ -88,7 +112,6 @@ have to secure that p is pointing to the head
 
 /*Given block ptr bp, compute address of next and previous blocks*/
 #define PREV_BLOCK(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-2 * WSIZE)))
-
 
 #define NEXT_BLOCK(bp) ((char *)(bp) + GET_SIZE(HEAD(bp)))
 
@@ -141,7 +164,7 @@ void *coalesce(void *bp) {
   // FOOT(PREV_BLOCK(bp)) = %llx;  \n ",(long long)(bp), (long
   // long)(PREV_BLOCK(bp)), (long long)(FOOT(PREV_BLOCK(bp))));
 
-#ifndef OPT
+#ifndef OPT1
   size_t prev_alloc = GET_SELF_ALLOC(FOOT(PREV_BLOCK(bp)));
 #else
   size_t prev_alloc = GET_PREV_ALLOC(HEAD(bp));
@@ -158,7 +181,7 @@ void *coalesce(void *bp) {
     remove_from_list(prev_ptr);
     size += GET_SIZE(HEAD(prev_ptr));
 
-#ifndef OPT
+#ifndef OPT1
     PUT(HEAD(prev_ptr), PACK(size, 0));
     PUT(FOOT(bp), PACK(size, 0));
 #else
@@ -173,7 +196,7 @@ void *coalesce(void *bp) {
     void *next_ptr = NEXT_BLOCK(bp);
     remove_from_list(next_ptr);
     size += GET_SIZE(HEAD(next_ptr));
-#ifndef OPT
+#ifndef OPT1
     PUT(HEAD(bp), PACK(size, 0));
     PUT(FOOT(next_ptr), PACK(size, 0));
 #else
@@ -182,7 +205,7 @@ void *coalesce(void *bp) {
     PUT(FOOT(next_ptr), PACK(size, bp_all_alloc));
 #endif
   } else {
-#ifdef OPT
+#ifdef OPT1
     void *next_head_ptr = HEAD(NEXT_BLOCK(bp));
     PUT(next_head_ptr, PACK(GET_SIZE(next_head_ptr), 1));
 #endif
@@ -196,8 +219,11 @@ void *coalesce(void *bp) {
 
 static void *find_fit(size_t asize) {
   void *bp;
-  for (bp = NEXT_BLANK_PTR(heap_listp); bp; bp = NEXT_BLANK_PTR(bp)) {
-    // dbg_printf("[find fit] bp = %d \n",(int)bp);
+  dbg_printf("[find fit] NEXT_BLANK_POS(head_listp) = %llx \n",
+             (long long)NEXT_BLANK_POS(heap_listp));
+  for (bp = NEXT_BLANK_PTR(heap_listp); bp && (long long)bp >= (long long)heap_listp;
+       bp = NEXT_BLANK_PTR(bp)) {
+    dbg_printf("[find fit] bp = %llx \n", (long long)bp);
     if (asize <= GET_SIZE(HEAD(bp))) {
       return bp;
     }
@@ -208,17 +234,18 @@ static void *find_fit(size_t asize) {
 static void place(void *bp, size_t asize) {
   dbg_printf("[place] enter \n");
   size_t csize = GET_SIZE(HEAD(bp));
-  dbg_printf("[place] asize = %lld, csize = %lld \n", (long long)asize, (long long)csize);
-  
+  dbg_printf("[place] asize = %lld, csize = %lld \n", (long long)asize,
+             (long long)csize);
+
   size_t bp_alloc = GET_SELF_ALLOC(HEAD(bp));
-#ifdef OPT
+#ifdef OPT1
   size_t bp_all_alloc = GET_ALL_ALLOC(HEAD(bp));
 #endif
   if (!bp_alloc)
     remove_from_list(bp);
   if ((csize - asize) >= MINSIZE) {
     dbg_printf("[place] split, bp = %llx \n", (long long)(bp));
-#ifndef OPT
+#ifndef OPT1
     PUT(HEAD(bp), PACK(asize, 1));
     PUT(FOOT(bp), PACK(asize, 1));
     bp = NEXT_BLOCK(bp);
@@ -228,14 +255,15 @@ static void place(void *bp, size_t asize) {
 #else
     PUT(HEAD(bp), PACK(asize, bp_all_alloc | 1));
     // PUT(FOOT(bp), PACK(asize, 1));
-    // dbg_printf("[place] HEAD(bp) = %llx, GET_SIZE(HEAD(bp)) = %lld \n", (long long)HEAD(bp), (long long)GET_SIZE(HEAD(bp)));
+    // dbg_printf("[place] HEAD(bp) = %llx, GET_SIZE(HEAD(bp)) = %lld \n", (long
+    // long)HEAD(bp), (long long)GET_SIZE(HEAD(bp)));
     bp = NEXT_BLOCK(bp);
     PUT(HEAD(bp), PACK(csize - asize, 2));
     PUT(FOOT(bp), PACK(csize - asize, 2));
     add_to_list(bp);
 #endif
   } else {
-#ifndef OPT
+#ifndef OPT1
     PUT(HEAD(bp), PACK(csize, 1));
     PUT(FOOT(bp), PACK(csize, 1));
 #else
@@ -263,7 +291,7 @@ static void *extend_heap(size_t size) {
 // dbg_printf("[extend_heap] GET(0X800000018) = %lld \n", (long
 // long)(GET(0X800000018)));
 /*Initialize free block header/footer and the epilogue header*/
-#ifndef OPT
+#ifndef OPT1
   PUT(HEAD(bp), PACK(size, 0));          /*Free block header*/
   PUT(FOOT(bp), PACK(size, 0));          /*Free block footer*/
   PUT(HEAD(NEXT_BLOCK(bp)), PACK(0, 1)); /*New epilogue header*/
@@ -294,22 +322,41 @@ static void *extend_heap(size_t size) {
 int mm_init(void) {
   // freopen("log.txt", "w", stdout);
   dbg_printf("[mm_init] enter \n");
+
+#ifndef OPT2
   heap_listp = mem_sbrk(8 * WSIZE);
+#else
+  heap_listp = mem_sbrk(6 * WSIZE);
+#endif
   // dbg_printf("[mm_init] heap_listp = %llx \n",(long long) heap_listp);
 
   if (heap_listp == (void *)-1)
     return -1;
 
+#ifndef OPT2
   PUT(heap_listp, 0);                                /* Alignment padding */
   PUT(heap_listp + (1 * WSIZE), PACK(6 * WSIZE, 1)); /* Prologue header */
   PUT_PTR(heap_listp + (2 * WSIZE), 0);              /* Blank prev pointer */
   PUT_PTR(heap_listp + (4 * WSIZE), 0);              /* Blank next pointer */
   PUT(heap_listp + (6 * WSIZE), PACK(6 * WSIZE, 1)); /* Prologue footer */
 
-#ifndef OPT
+#ifndef OPT1
   PUT(heap_listp + (7 * WSIZE), PACK(0, 1)); /* Epilogue header */
 #else
   PUT(heap_listp + (7 * WSIZE), PACK(0, 3)); /* Epilogue header */
+#endif
+#else
+  PUT(heap_listp, 0);                                /* Alignment padding */
+  PUT(heap_listp + (1 * WSIZE), PACK(4 * WSIZE, 1)); /* Prologue header */
+  PUT_PTR(heap_listp + (2 * WSIZE), 0);              /* Blank prev pointer */
+  PUT_PTR(heap_listp + (3 * WSIZE), 0);              /* Blank next pointer */
+  PUT(heap_listp + (4 * WSIZE), PACK(4 * WSIZE, 1)); /* Prologue footer */
+
+#ifndef OPT1
+  PUT(heap_listp + (5 * WSIZE), PACK(0, 1));         /* Epilogue header */
+#else
+  PUT(heap_listp + (5 * WSIZE), PACK(0, 3)); /* Epilogue header */
+#endif
 #endif
 
   // dbg_printf("[mm_init] GET(0X800000018) = %lld \n", (long
@@ -342,7 +389,7 @@ void *malloc(size_t size) {
 
   dbg_printf("[malloc] enter \n");
   dbg_printf("[malloc] size = %lld \n", (long long)size);
-#ifndef OPT
+#ifndef OPT1
   int newsize = ALIGN(MAX(MINSIZE, size + 2 * WSIZE));
 #else
   int newsize = ALIGN(MAX(MINSIZE, size + WSIZE));
@@ -396,7 +443,7 @@ void free(void *ptr) {
   }
 
   size_t size = GET_SIZE(HEAD(ptr));
-#ifndef OPT
+#ifndef OPT1
   PUT(HEAD(ptr), PACK(size, 0));
   PUT(FOOT(ptr), PACK(size, 0));
 #else
@@ -404,7 +451,8 @@ void free(void *ptr) {
   PUT(HEAD(ptr), PACK(size, prev_alloc));
   PUT(FOOT(ptr), PACK(size, prev_alloc));
   void *nxt_ptr = NEXT_BLOCK(ptr);
-  PUT(HEAD(nxt_ptr), PACK(GET_SIZE(HEAD(nxt_ptr)), GET_SELF_ALLOC(HEAD(nxt_ptr))));
+  PUT(HEAD(nxt_ptr),
+      PACK(GET_SIZE(HEAD(nxt_ptr)), GET_SELF_ALLOC(HEAD(nxt_ptr))));
 #endif
   coalesce(ptr);
   dbg_printf("[free] exit \n");
@@ -431,7 +479,7 @@ void *realloc(void *oldptr, size_t size) {
     return malloc(size);
   }
   oldsize = GET_SIZE(HEAD(oldptr));
-#ifndef OPT
+#ifndef OPT1
   size_t new_size = ALIGN(MAX(MINSIZE, size + 2 * WSIZE));
 #else
   size_t new_size = ALIGN(MAX(MINSIZE, size + WSIZE));
@@ -446,7 +494,7 @@ void *realloc(void *oldptr, size_t size) {
       dbg_printf("[realloc] exit \n");
       return NULL;
     }
-#ifndef OPT
+#ifndef OPT1
     memcpy(newptr, oldptr, oldsize - 2 * WSIZE);
 #else
     memcpy(newptr, oldptr, oldsize - WSIZE);
