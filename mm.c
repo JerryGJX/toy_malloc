@@ -344,6 +344,7 @@ int mm_init(void) {
  *      Always allocate a block whose size is a multiple of the alignment.
  */
 void *malloc(size_t size) {
+    // mm_checkheap(0);
     dbg_printf("[malloc] enter \n");
     dbg_printf("[malloc] size = %lld \n", (long long) size);
 #ifndef OPT1
@@ -455,7 +456,7 @@ void mm_checkheap(int verbose) {
     /*Get gcc to be quiet. */
     verbose = verbose;
     int flag = 0;
-    // chech merge
+    // check merge
     for (char *ptr = heap_listp; GET_SIZE(HEAD(ptr)) != 0;
     ptr = NEXT_BLOCK(ptr)) {
         if (GET_SELF_ALLOC(ptr) == 0) {
